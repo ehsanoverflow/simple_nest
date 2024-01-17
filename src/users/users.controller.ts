@@ -1,33 +1,68 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFile} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import {FileInterceptor} from "@nestjs/platform-express";
+import {createWriteStream, readFileSync} from 'fs'
+var path = require('path')
 
-@Controller('users')
+@Controller('api/users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  @Post()
-  create(@Body() createUserDto: CreateUserDto) {
-    return this.usersService.create(createUserDto);
+  @Post('')
+  @UseInterceptors(FileInterceptor('avatar'))
+  async create(@UploadedFile() avatar: Express.Multer.File, @Body() createUserDto: CreateUserDto) {
+    try {
+      const newUser = await this.usersService.create(createUserDto);
+      const ws = createWriteStream('uploads/avatar/' + newUser.id + path.extname(avatar.originalname))
+      ws.write(avatar.buffer);
+      ws.close();
+      const contents = readFileSync('uploads/avatar/' + newUser.id + path.extname(avatar.originalname), {
+        encoding: 'base64'
+      });
+      console.log(avatar);
+      return {
+        result: true,
+        data: newUser
+      };
+    } catch (errors) {
+      return {
+        result: false,
+        errors: errors
+      };
+    }
+
   }
 
-  @Get()
+  @Get('')
   findAll() {
     return this.usersService.findAll();
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.usersService.findOne(+id);
+  @Get('/:id')
+  async findOne(@Param('id') id: string) {
+    try {
+      let user = await this.usersService.findOne(id);
+      return {
+        result: (!!user),
+        data: user
+      };
+    } catch (errors) {
+      console.log('catch')
+      return {
+        result: false,
+        errors: errors
+      };
+    }
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    return this.usersService.update(+id, updateUserDto);
-  }
+  // @Patch(':id')
+  // update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
+  //   return this.usersService.update(+id, updateUserDto);
+  // }
 
-  @Delete(':id')
+  @Delete('/:id/avatar')
   remove(@Param('id') id: string) {
     return this.usersService.remove(+id);
   }
